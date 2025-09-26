@@ -1,0 +1,94 @@
+### Prompt 1:
+--  angleToTarget :: Position -> Position -> Angle. Determina el ángulo desde una posición origen hacia una posición objetivo. Útil para calcular la dirección en la que debe apuntar o moverse un objeto.
+-- El ángulo viene dado por la fórmula: arctan ((y2 - y1) / (x2 - x1))
+angleToTarget :: Position -> Position -> Radian
+angleToTarget (x1,y1) (x2, y2) = atan ((y2 - y1) / (x2 - x1))
+
+--  getVertices :: (Point, Point, Point, Point, Angle) -> [Point]. Genera una lista de vértices (puntos) a partir de cuatro puntos base y un ángulo de rotación.
+{- Las coordenadas del nuevo punto se calculan de la siguiente manera:
+        Coordenada x: cos(a + b) * sqrt(x^2 + y^2)
+        Coordenada y: sin(a + b) * sqrt(x^2 + y^2)
+    siendo b el ángulo entre el punto p y la horizontal (paralela al eje X) que pasa por el centroide -}
+{- Añadido en HAUS2: En la primera entrega supusimos que el giro se hacía con respecto al origen de coordenadas.
+Como intuimos que esta función se va a utilizar para girar los tanques del juego, para esta segunda tarea hemos
+decidido cambiar la función para calcular los giros con respecto al centroide de la figura definida por los puntos.
+Para calcularlo de una manera sencilla, hacemos la media de las coordenadas x e y -}
+getVertices :: (Point, Point, Point, Point, Radian) -> [Point]
+getVertices ((x1,y1), (x2,y2), (x3,y3), (x4,y4), a) = [rotarPunto p | p <- [(x1,y1), (x2,y2), (x3,y3), (x4,y4)]]
+    where
+        (cx,cy) = ((sum [x1, x2, x3, x4])/4, (sum [y1, y2, y3, y4])/4) -- centroide
+        rotarPunto (x,y) = (cos (a + angleToTarget (x,y) (cx,cy)) * sqrt ((x-cx)**2 + (y-cy)**2), sin (a + angleToTarget (x,y) (cx,cy)) * sqrt ((x-cx)**2 + (y-cy)**2))
+
+donde está el problema?
+
+### Observaciones sobre la respuesta:
+Nos sugirió usar atan2 en lugar de atan para evitar divisiones entre 0, solucionó que rotarPunto devolvía el nuevo punto centrado en el origen de
+coordenadas en lugar de en el centroide, y mejoró la legibilidad de rotarPunto usando let/in. Posteriormente hicimos una modificación ya que aquí 
+no detectó el error indicado en Prompt 3
+
+============================
+
+### Prompt 2:
+updateVelocity :: Robot -> AccionAvance -> AccionGiro -> Robot
+updateVelocity robot accion_d accion_g = updateRobotVelocity robot newV newA
+    where
+        v = velocidad_robot robot
+        vmax = vmax robot
+        acel = aceleracion_avance robot
+        newV
+            | accion_a == StopAvance
+                | (v == 0) || (abs v < abs acel) = 0    -- si está parado o a punto de parar, se para
+                | v > 0 = v - acel                      -- si se está moviendo, desacelera
+                | v < 0 = v + acel 
+            | accion_a == Forwards
+                | v > 0 = min (v + acel) vmax   -- si ya está avanzando, acelerar solo si no ha llegado a vmax
+                | otherwise = v + acel          -- si no, acelerar hacia delante
+            | accion_a == Backwards
+                | v < 0 = min (v + acel) -vmax  -- si ya está avanzando, acelerar solo si no ha llegado a vmax
+                | otherwise = v - acel          -- si no, acelerar hacia atrás
+        dirGiro
+            | accion_g == TurnRight = 1
+            | accion_g == TurnLeft = -1
+            | otherwise = 0
+        newA = dirGiro * (paso_giro robot) + (angulo_robot robot)
+
+convierte los guardas incorrectos a case
+
+### Observaciones sobre la respuesta:
+Código editado correctamente, no hicimos modificaciones respecto a la respuesta
+
+============================
+
+### Prompt 3:
+-- centroide: media de las coordenadas (x,y) de una lista de puntos
+centroide :: [Point] -> Point
+centroide ps = ((sum [x | (x,_) <- ps])/(fromIntegral (length ps)), (sum [y | (_,y) <- ps])/(fromIntegral (length ps)))
+
+--  getVertices :: (Point, Point, Point, Point, Angle) -> [Point]. Genera una lista de vértices (puntos) a partir de cuatro puntos base y un ángulo de rotación.
+{- Las coordenadas del nuevo punto se calculan de la siguiente manera:
+        Coordenada x: cx + cos(a + b) * sqrt((x-cx)^2 + (y-cy)^2)
+        Coordenada y: cy + sin(a + b) * sqrt((x-cx)^2 + (y-cy)^2)
+    siendo b el ángulo entre el punto p y la horizontal (paralela al eje X) que pasa por el centroide -}
+{- Añadido en HAUS2: En la primera entrega supusimos que el giro se hacía con respecto al origen de coordenadas.
+Como intuimos que esta función se va a utilizar para girar los tanques del juego, para esta segunda tarea hemos
+decidido cambiar la función para calcular los giros con respecto al centroide (cx,yx) de la figura definida por los puntos.
+Para calcularlo de una manera sencilla, hacemos la media de las coordenadas x e y -}
+getVertices :: (Point, Point, Point, Point, Radian) -> [Point]
+getVertices (p1, p2, p3, p4, a) = [rotarPunto p | p <- [p1, p2, p3, p4]]
+    where
+        (cx,cy) = centroide [p1, p2, p3, p4]
+        rotarPunto (x,y) =
+            let r = sqrt ((x-cx)**2 + (y-cy)**2)
+                b = angleToTarget (x,y) (cx,cy)
+            in (cx + cos (a + b) * r, cy + sin (a + b) * r)
+
+*Main> getVertices ((1,0),(2,0),(2,3),(1,3),0)   
+[(2.0,3.0),(0.9999998,3.0),(0.9999998,0.0),(2.0,0.0)]
+
+le doy angulo 0 pero me cambia los puntos, por que?
+
+### Observaciones sobre la respuesta:
+Observó que el fallo estaba en b = angleToTarget (x,y) (cx,cy), ya que el punto y el centroide se debían introducir en el orden inverso: b = angleToTarget (cx,cy) (x,y) 
+
+============================
+
